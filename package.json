@@ -6,6 +6,7 @@
   "scripts": {
     "build": "tsc --noEmit",
     "dev": "tsx src/cli.ts",
+    "validate": "tsx src/cli.ts validate",
     "render": "tsx src/cli.ts render",
     "test": "vitest run",
     "format": "prettier --write .",
