@@ -1,0 +1,24 @@
+{
+  "name": "mermaid-agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc --noEmit",
+    "dev": "tsx src/cli.ts",
+    "render": "tsx src/cli.ts render",
+    "test": "vitest run",
+    "format": "prettier --write .",
+    "check": "npm run build && npm test"
+  },
+  "dependencies": {
+    "@mermaid-js/mermaid-cli": "^11.4.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.7",
+    "prettier": "^3.4.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3",
+    "vitest": "^4.1.8"
+  }
+}
