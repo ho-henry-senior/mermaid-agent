@@ -1,0 +1,8 @@
+sequenceDiagram
+  actor Customer
+  participant Store
+  participant Payment
+  Customer->>Store: Place order
+  Store->>Payment: Authorize card
+  Payment-->>Store: Authorization approved
+  Store-->>Customer: Send receipt

@@ -9,6 +9,7 @@
     "validate": "tsx src/cli.ts validate",
     "render": "tsx src/cli.ts render",
     "test": "vitest run",
+    "test:runtime": "RUN_MERMAID_RUNTIME_TESTS=1 vitest run tests/mermaid/render-runtime.test.ts",
     "format": "prettier --write .",
     "check": "npm run build && npm test"
   },

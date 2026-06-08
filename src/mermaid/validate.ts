@@ -75,7 +75,7 @@ async function analyzeMermaidSource(source: string): Promise<MermaidSourceValida
     return { ok: false, error: 'Mermaid source is empty.' }
   }
 
-  const firstLine = trimmed.split(/\r?\n/, 1)[0]?.trim() ?? ''
+  const firstLine = findFirstDiagramLine(trimmed)
   const startsWithKnownDiagram = knownDiagramStarters.some(
     (starter) => firstLine === starter || firstLine.startsWith(`${starter} `),
   )
@@ -146,6 +146,35 @@ export async function validateMermaidFile(
 
 function isNodeError(error: unknown): error is NodeJS.ErrnoException {
   return error instanceof Error && 'code' in error
+}
+
+function findFirstDiagramLine(source: string): string {
+  const lines = source.split(/\r?\n/)
+  let index = 0
+
+  if (lines[index]?.trim() === '---') {
+    index += 1
+
+    while (index < lines.length && lines[index]?.trim() !== '---') {
+      index += 1
+    }
+
+    if (lines[index]?.trim() === '---') {
+      index += 1
+    }
+  }
+
+  while (index < lines.length) {
+    const line = lines[index]?.trim() ?? ''
+
+    if (line.length > 0 && !line.startsWith('%%')) {
+      return line
+    }
+
+    index += 1
+  }
+
+  return ''
 }
 
 function formatMermaidParseError(error: unknown): string {

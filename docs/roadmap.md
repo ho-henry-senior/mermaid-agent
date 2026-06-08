@@ -20,11 +20,11 @@ Implemented capabilities:
 
 This came first because the future agent needs reliable tools to call.
 
-## Current Focus: Harden the CLI
+## Completed: Harden the CLI
 
 Goal: make validation and rendering dependable enough to become agent tools.
 
-Planned capabilities:
+Implemented capabilities:
 
 - Add real Mermaid syntax validation rather than only checking diagram starters.
 - Cover successful SVG rendering in tests where the runtime dependencies are available.
@@ -32,6 +32,13 @@ Planned capabilities:
   produce clear messages.
 - Keep generated `.svg` files ignored unless the project later decides to commit outputs.
 - Add examples that exercise common diagram types and known failure cases.
+- Support explicit render options for theme, background color, width, and height.
+- Handle normal Mermaid preambles such as leading comments and YAML frontmatter.
+
+Remaining hardening opportunities:
+
+- Add more diagram-type fixtures as new project workflows need them.
+- Expand runtime tests across more output options if they become important to agent behavior.
 
 ## Next: Diagram Generation Agent
 

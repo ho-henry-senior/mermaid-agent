@@ -5,6 +5,16 @@ import { validateMermaidFile } from './validate.js'
 export type RenderMermaidFileInput = {
   inputPath: string
   outputPath: string
+  options?: RenderMermaidOptions
+}
+
+export type MermaidTheme = 'default' | 'forest' | 'dark' | 'neutral'
+
+export type RenderMermaidOptions = {
+  theme?: MermaidTheme
+  backgroundColor?: string
+  width?: number
+  height?: number
 }
 
 export type RenderMermaidFileResult =
@@ -40,7 +50,7 @@ export async function renderMermaidFile(
 
 function runDefaultMermaidCli(input: RenderMermaidFileInput): Promise<RenderMermaidFileResult> {
   return new Promise((resolve) => {
-    const child = spawn('mmdc', ['-i', input.inputPath, '-o', input.outputPath], {
+    const child = spawn('mmdc', buildMermaidCliArgs(input), {
       stdio: ['ignore', 'pipe', 'pipe'],
     })
 
@@ -69,6 +79,33 @@ function runDefaultMermaidCli(input: RenderMermaidFileInput): Promise<RenderMerm
       })
     })
   })
+}
+
+export function buildMermaidCliArgs(input: RenderMermaidFileInput): string[] {
+  const args = ['-i', input.inputPath, '-o', input.outputPath]
+  const { options } = input
+
+  if (!options) {
+    return args
+  }
+
+  if (options.theme) {
+    args.push('--theme', options.theme)
+  }
+
+  if (options.backgroundColor) {
+    args.push('--backgroundColor', options.backgroundColor)
+  }
+
+  if (options.width) {
+    args.push('--width', String(options.width))
+  }
+
+  if (options.height) {
+    args.push('--height', String(options.height))
+  }
+
+  return args
 }
 
 export function classifyRendererStartupError(error: NodeJS.ErrnoException): string {

@@ -91,6 +91,83 @@ describe('runCli', () => {
     })
   })
 
+  it('passes render options to the Mermaid renderer', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'mermaid-agent-'))
+    await writeFile(join(directory, 'diagram.mmd'), 'flowchart TD\n  A --> B')
+    const buffer = createBufferedIo()
+    const renderInputs: unknown[] = []
+
+    await expect(
+      runCli(
+        [
+          'render',
+          'diagram.mmd',
+          'diagram.svg',
+          '--theme',
+          'neutral',
+          '--background-color',
+          'transparent',
+          '--width',
+          '1024',
+          '--height',
+          '768',
+        ],
+        {
+          cwd: directory,
+          io: buffer.io,
+          operations: {
+            renderMermaidFile: async (input) => {
+              renderInputs.push(input)
+              return {
+                ok: true,
+                outputPath: input.outputPath,
+              }
+            },
+          },
+        },
+      ),
+    ).resolves.toBe(0)
+
+    expect(renderInputs).toEqual([
+      {
+        inputPath: join(directory, 'diagram.mmd'),
+        outputPath: join(directory, 'diagram.svg'),
+        options: {
+          theme: 'neutral',
+          backgroundColor: 'transparent',
+          width: 1024,
+          height: 768,
+        },
+      },
+    ])
+  })
+
+  it('reports unsupported render themes', async () => {
+    const buffer = createBufferedIo()
+
+    await expect(
+      runCli(['render', 'diagram.mmd', 'diagram.svg', '--theme', 'ocean'], { io: buffer.io }),
+    ).resolves.toBe(1)
+
+    expect(buffer.output()).toEqual({
+      stdout: '',
+      stderr: 'Unsupported Mermaid theme "ocean". Use one of: default, forest, dark, neutral.\n',
+    })
+  })
+
+  it('reports invalid render dimensions', async () => {
+    const buffer = createBufferedIo()
+
+    await expect(
+      runCli(['render', 'diagram.mmd', 'diagram.svg', '--width', '0'], { io: buffer.io }),
+    ).resolves.toBe(1)
+
+    expect(buffer.output()).toEqual({
+      stdout: '',
+      stderr: 'Render option width must be a positive integer.\n',
+    })
+  })
+
   it('shows usage for missing arguments', async () => {
     const buffer = createBufferedIo()
 

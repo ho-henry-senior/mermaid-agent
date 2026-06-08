@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { describe, expect, it } from 'vitest'
 
 import {
+  buildMermaidCliArgs,
   classifyRendererExitError,
   classifyRendererStartupError,
   renderMermaidFile,
@@ -62,6 +63,45 @@ describe('renderMermaidFile', () => {
       ok: true,
       outputPath,
     })
+  })
+})
+
+describe('buildMermaidCliArgs', () => {
+  it('builds default render arguments', () => {
+    expect(
+      buildMermaidCliArgs({
+        inputPath: 'diagram.mmd',
+        outputPath: 'diagram.svg',
+      }),
+    ).toEqual(['-i', 'diagram.mmd', '-o', 'diagram.svg'])
+  })
+
+  it('builds render arguments with explicit output options', () => {
+    expect(
+      buildMermaidCliArgs({
+        inputPath: 'diagram.mmd',
+        outputPath: 'diagram.svg',
+        options: {
+          theme: 'dark',
+          backgroundColor: 'transparent',
+          width: 1024,
+          height: 768,
+        },
+      }),
+    ).toEqual([
+      '-i',
+      'diagram.mmd',
+      '-o',
+      'diagram.svg',
+      '--theme',
+      'dark',
+      '--backgroundColor',
+      'transparent',
+      '--width',
+      '1024',
+      '--height',
+      '768',
+    ])
   })
 })
 
