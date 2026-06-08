@@ -2,15 +2,14 @@
 
 ## Direction
 
-Build a repeatable Mermaid diagram workflow before expanding into broader design
-tooling. The project should first provide reliable local tools for validating,
-rendering, revising, and batch-producing Mermaid diagrams. Figma integration stays
-deferred until SVG export is predictable enough to support it.
+Build a repeatable Mermaid diagram workflow before expanding into broader design tooling. The
+project should first provide reliable local tools for validating, rendering, revising, and
+batch-producing Mermaid diagrams. Figma integration stays deferred until SVG export is predictable
+enough to support it.
 
 ## Completed: Mermaid Workflow CLI Foundation
 
-Goal: given a Mermaid source file, validate it, render it to SVG, and report
-clear results.
+Goal: given a Mermaid source file, validate it, render it to SVG, and report clear results.
 
 Implemented capabilities:
 
@@ -29,8 +28,8 @@ Planned capabilities:
 
 - Add real Mermaid syntax validation rather than only checking diagram starters.
 - Cover successful SVG rendering in tests where the runtime dependencies are available.
-- Improve renderer error handling so syntax, missing binary, browser, and filesystem
-  failures produce clear messages.
+- Improve renderer error handling so syntax, missing binary, browser, and filesystem failures
+  produce clear messages.
 - Keep generated `.svg` files ignored unless the project later decides to commit outputs.
 - Add examples that exercise common diagram types and known failure cases.
 
@@ -81,6 +80,5 @@ Planned capabilities:
 
 ## Deferred: Figma Workflow
 
-Explore Figma only after the SVG workflow is reliable. Possible future work
-includes SVG-to-Figma import, plugin integration, or a handoff format for design
-review.
+Explore Figma only after the SVG workflow is reliable. Possible future work includes SVG-to-Figma
+import, plugin integration, or a handoff format for design review.

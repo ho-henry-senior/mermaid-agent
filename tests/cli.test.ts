@@ -67,6 +67,30 @@ describe('runCli', () => {
     })
   })
 
+  it('renders a Mermaid file', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'mermaid-agent-'))
+    await writeFile(join(directory, 'diagram.mmd'), 'flowchart TD\n  A --> B')
+    const buffer = createBufferedIo()
+
+    await expect(
+      runCli(['render', 'diagram.mmd', 'diagram.svg'], {
+        cwd: directory,
+        io: buffer.io,
+        operations: {
+          renderMermaidFile: async (input) => ({
+            ok: true,
+            outputPath: input.outputPath,
+          }),
+        },
+      }),
+    ).resolves.toBe(0)
+
+    expect(buffer.output()).toEqual({
+      stdout: `Rendered ${join(directory, 'diagram.svg')}\n`,
+      stderr: '',
+    })
+  })
+
   it('shows usage for missing arguments', async () => {
     const buffer = createBufferedIo()
 

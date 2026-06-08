@@ -6,23 +6,38 @@ import { describe, expect, it } from 'vitest'
 import { validateMermaidFile, validateMermaidSource } from '../../src/mermaid/validate.js'
 
 describe('validateMermaidSource', () => {
-  it('accepts a supported Mermaid diagram', () => {
-    expect(validateMermaidSource('flowchart TD\n  A --> B')).toEqual({
+  it('accepts a supported Mermaid diagram', async () => {
+    await expect(validateMermaidSource('flowchart TD\n  A --> B')).resolves.toEqual({
       ok: true,
     })
   })
 
-  it('rejects empty input', () => {
-    expect(validateMermaidSource('')).toEqual({
+  it('accepts labeled flowchart nodes in Node', async () => {
+    await expect(
+      validateMermaidSource('flowchart TD\n  A[User opens signup page] --> B[Submits details]'),
+    ).resolves.toEqual({
+      ok: true,
+    })
+  })
+
+  it('rejects empty input', async () => {
+    await expect(validateMermaidSource('')).resolves.toEqual({
       ok: false,
       error: 'Mermaid source is empty.',
     })
   })
 
-  it('rejects input without a supported diagram starter', () => {
-    expect(validateMermaidSource('A --> B')).toEqual({
+  it('rejects input without a supported diagram starter', async () => {
+    await expect(validateMermaidSource('A --> B')).resolves.toEqual({
       ok: false,
       error: 'First line must start with a supported Mermaid diagram type. Found: "A --> B"',
+    })
+  })
+
+  it('rejects invalid Mermaid syntax', async () => {
+    await expect(validateMermaidSource('flowchart TD\n  A -->')).resolves.toMatchObject({
+      ok: false,
+      error: expect.stringContaining('Mermaid syntax error:'),
     })
   })
 })
@@ -36,6 +51,45 @@ describe('validateMermaidFile', () => {
     await expect(validateMermaidFile(inputPath)).resolves.toEqual({
       ok: true,
       inputPath,
+    })
+  })
+
+  it('uses renderer validation when the Node parser cannot sanitize labels', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'mermaid-agent-'))
+    const inputPath = join(directory, 'valid.mmd')
+    await writeFile(inputPath, 'flowchart TD\n  A[User opens signup page] --> B[Submits details]')
+    const validatedPaths: string[] = []
+
+    await expect(
+      validateMermaidFile(inputPath, {
+        validateWithRenderer: async (path) => {
+          validatedPaths.push(path)
+          return { ok: true }
+        },
+      }),
+    ).resolves.toEqual({
+      ok: true,
+      inputPath,
+    })
+
+    expect(validatedPaths).toEqual([inputPath])
+  })
+
+  it('returns renderer validation errors for labeled files', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'mermaid-agent-'))
+    const inputPath = join(directory, 'invalid.mmd')
+    await writeFile(inputPath, 'flowchart TD\n  A[User opens signup page] --> B[Submits details]')
+
+    await expect(
+      validateMermaidFile(inputPath, {
+        validateWithRenderer: async () => ({
+          ok: false,
+          error: 'Renderer parse error',
+        }),
+      }),
+    ).resolves.toEqual({
+      ok: false,
+      error: 'Renderer parse error',
     })
   })
 

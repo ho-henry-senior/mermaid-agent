@@ -1,4 +1,11 @@
-import { readFile } from 'node:fs/promises'
+import { spawn } from 'node:child_process'
+import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
+import mermaid from 'mermaid'
+
+mermaid.initialize({ startOnLoad: false })
 
 const knownDiagramStarters = [
   'flowchart',
@@ -38,7 +45,30 @@ export type ValidateMermaidFileResult =
       error: string
     }
 
-export function validateMermaidSource(source: string): MermaidValidationResult {
+export type RendererSyntaxValidator = (inputPath: string) => Promise<MermaidValidationResult>
+
+export type ValidateMermaidFileOptions = {
+  validateWithRenderer?: RendererSyntaxValidator
+}
+
+type MermaidSourceValidationAnalysis =
+  | MermaidValidationResult
+  | {
+      ok: true
+      needsRendererValidation: true
+    }
+
+export async function validateMermaidSource(source: string): Promise<MermaidValidationResult> {
+  const analysis = await analyzeMermaidSource(source)
+
+  if ('needsRendererValidation' in analysis) {
+    return { ok: true }
+  }
+
+  return analysis
+}
+
+async function analyzeMermaidSource(source: string): Promise<MermaidSourceValidationAnalysis> {
   const trimmed = source.trim()
 
   if (trimmed.length === 0) {
@@ -57,10 +87,28 @@ export function validateMermaidSource(source: string): MermaidValidationResult {
     }
   }
 
+  try {
+    await mermaid.parse(trimmed)
+  } catch (error: unknown) {
+    // Mermaid's Node parser can hit browser-only sanitizer code for labels.
+    // Rendering with mmdc still performs the final syntax check for those files.
+    if (isMermaidParserEnvironmentError(error)) {
+      return { ok: true, needsRendererValidation: true }
+    }
+
+    return {
+      ok: false,
+      error: `Mermaid syntax error: ${formatMermaidParseError(error)}`,
+    }
+  }
+
   return { ok: true }
 }
 
-export async function validateMermaidFile(inputPath: string): Promise<ValidateMermaidFileResult> {
+export async function validateMermaidFile(
+  inputPath: string,
+  options: ValidateMermaidFileOptions = {},
+): Promise<ValidateMermaidFileResult> {
   let source: string
 
   try {
@@ -78,10 +126,19 @@ export async function validateMermaidFile(inputPath: string): Promise<ValidateMe
     }
   }
 
-  const validation = validateMermaidSource(source)
+  const validation = await analyzeMermaidSource(source)
 
   if (!validation.ok) {
     return validation
+  }
+
+  if ('needsRendererValidation' in validation) {
+    const validateWithRenderer = options.validateWithRenderer ?? runDefaultRendererSyntaxValidator
+    const rendererValidation = await validateWithRenderer(inputPath)
+
+    if (!rendererValidation.ok) {
+      return rendererValidation
+    }
   }
 
   return { ok: true, inputPath }
@@ -89,4 +146,74 @@ export async function validateMermaidFile(inputPath: string): Promise<ValidateMe
 
 function isNodeError(error: unknown): error is NodeJS.ErrnoException {
   return error instanceof Error && 'code' in error
+}
+
+function formatMermaidParseError(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error)
+  const lines = message
+    .split(/\r?\n/)
+    .map((line) => line.trimEnd())
+    .filter((line) => line.length > 0)
+
+  return lines.join(' ')
+}
+
+function isMermaidParserEnvironmentError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error)
+
+  return (
+    message === 'DOMPurify.addHook is not a function' ||
+    message === 'DOMPurify.sanitize is not a function'
+  )
+}
+
+async function runDefaultRendererSyntaxValidator(
+  inputPath: string,
+): Promise<MermaidValidationResult> {
+  const directory = await mkdtemp(join(tmpdir(), 'mermaid-agent-validate-'))
+  const outputPath = join(directory, 'syntax-check.svg')
+
+  try {
+    return await runMermaidCliSyntaxCheck(inputPath, outputPath)
+  } finally {
+    await rm(directory, { force: true, recursive: true })
+  }
+}
+
+function runMermaidCliSyntaxCheck(
+  inputPath: string,
+  outputPath: string,
+): Promise<MermaidValidationResult> {
+  return new Promise((resolve) => {
+    const child = spawn('mmdc', ['-i', inputPath, '-o', outputPath], {
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+
+    let stderr = ''
+
+    child.stderr.on('data', (chunk: Buffer) => {
+      stderr += chunk.toString()
+    })
+
+    child.on('error', (error) => {
+      resolve({
+        ok: false,
+        error: `Failed to start Mermaid syntax renderer: ${error.message}`,
+      })
+    })
+
+    child.on('close', (code) => {
+      if (code === 0) {
+        resolve({ ok: true })
+        return
+      }
+
+      resolve({
+        ok: false,
+        error:
+          stderr.trim() ||
+          `Mermaid syntax renderer exited with code ${code ?? 'unknown'} without an error message.`,
+      })
+    })
+  })
 }

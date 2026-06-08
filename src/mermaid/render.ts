@@ -17,8 +17,15 @@ export type RenderMermaidFileResult =
       error: string
     }
 
+export type MermaidCliRunner = (input: RenderMermaidFileInput) => Promise<RenderMermaidFileResult>
+
+export type RenderMermaidFileOptions = {
+  runMermaidCli?: MermaidCliRunner
+}
+
 export async function renderMermaidFile(
   input: RenderMermaidFileInput,
+  options: RenderMermaidFileOptions = {},
 ): Promise<RenderMermaidFileResult> {
   const validation = await validateMermaidFile(input.inputPath)
 
@@ -26,6 +33,12 @@ export async function renderMermaidFile(
     return validation
   }
 
+  const runMermaidCli = options.runMermaidCli ?? runDefaultMermaidCli
+
+  return runMermaidCli(input)
+}
+
+function runDefaultMermaidCli(input: RenderMermaidFileInput): Promise<RenderMermaidFileResult> {
   return new Promise((resolve) => {
     const child = spawn('mmdc', ['-i', input.inputPath, '-o', input.outputPath], {
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -40,7 +53,7 @@ export async function renderMermaidFile(
     child.on('error', (error) => {
       resolve({
         ok: false,
-        error: `Failed to start Mermaid renderer: ${error.message}`,
+        error: classifyRendererStartupError(error),
       })
     })
 
@@ -52,8 +65,54 @@ export async function renderMermaidFile(
 
       resolve({
         ok: false,
-        error: stderr.trim() || `Mermaid renderer exited with code ${code}`,
+        error: classifyRendererExitError(code, stderr),
       })
     })
   })
+}
+
+export function classifyRendererStartupError(error: NodeJS.ErrnoException): string {
+  if (error.code === 'ENOENT') {
+    return 'Mermaid renderer not found. Ensure `mmdc` is installed and available on PATH.'
+  }
+
+  if (error.code === 'EACCES') {
+    return `Mermaid renderer is not executable: ${error.message}`
+  }
+
+  return `Failed to start Mermaid renderer: ${error.message}`
+}
+
+export function classifyRendererExitError(code: number | null, stderr: string): string {
+  const message = stderr.trim()
+
+  if (!message) {
+    return `Mermaid renderer exited with code ${code ?? 'unknown'} without an error message.`
+  }
+
+  if (mentionsBrowserFailure(message)) {
+    return `Mermaid renderer could not start a browser: ${message}`
+  }
+
+  if (mentionsSyntaxFailure(message)) {
+    return `Mermaid renderer reported a syntax error: ${message}`
+  }
+
+  if (mentionsFilesystemFailure(message)) {
+    return `Mermaid renderer could not access an input or output file: ${message}`
+  }
+
+  return `Mermaid renderer failed with code ${code ?? 'unknown'}: ${message}`
+}
+
+function mentionsBrowserFailure(message: string): boolean {
+  return /browser|chrome|chromium|puppeteer/i.test(message)
+}
+
+function mentionsSyntaxFailure(message: string): boolean {
+  return /parse error|syntax error|lexical error/i.test(message)
+}
+
+function mentionsFilesystemFailure(message: string): boolean {
+  return /enoent|eacces|permission denied|no such file|not a directory/i.test(message)
 }

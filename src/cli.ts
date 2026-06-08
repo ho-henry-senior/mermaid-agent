@@ -1,8 +1,8 @@
 import { fileURLToPath } from 'node:url'
 import { resolve } from 'node:path'
 
-import { renderMermaidFile } from './mermaid/render.js'
-import { validateMermaidFile } from './mermaid/validate.js'
+import { renderMermaidFile, type RenderMermaidFileResult } from './mermaid/render.js'
+import { validateMermaidFile, type ValidateMermaidFileResult } from './mermaid/validate.js'
 
 type CliIo = {
   stdout: Pick<typeof process.stdout, 'write'>
@@ -12,6 +12,10 @@ type CliIo = {
 type RunCliOptions = {
   cwd?: string
   io?: CliIo
+  operations?: {
+    renderMermaidFile?: typeof renderMermaidFile
+    validateMermaidFile?: typeof validateMermaidFile
+  }
 }
 
 function usage(): string {
@@ -32,10 +36,17 @@ export async function runCli(args: string[], options: RunCliOptions = {}): Promi
     stdout: process.stdout,
     stderr: process.stderr,
   }
+  const operations = {
+    renderMermaidFile,
+    validateMermaidFile,
+    ...options.operations,
+  }
   const [command, input, output] = args
 
   if (command === 'validate' && input && !output) {
-    const result = await validateMermaidFile(resolve(cwd, input))
+    const result: ValidateMermaidFileResult = await operations.validateMermaidFile(
+      resolve(cwd, input),
+    )
 
     if (!result.ok) {
       io.stderr.write(`${result.error}\n`)
@@ -51,7 +62,7 @@ export async function runCli(args: string[], options: RunCliOptions = {}): Promi
     return 1
   }
 
-  const result = await renderMermaidFile({
+  const result: RenderMermaidFileResult = await operations.renderMermaidFile({
     inputPath: resolve(cwd, input),
     outputPath: resolve(cwd, output),
   })
