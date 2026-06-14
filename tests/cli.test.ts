@@ -158,18 +158,51 @@ describe('runCli', () => {
     expect(buffer.output().stdout).toContain('Generated flowchart diagram.\n')
   })
 
+  it('accepts the OpenAI generation provider', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'mermaid-agent-'))
+    const buffer = createBufferedIo()
+    const generateOptions: unknown[] = []
+
+    await expect(
+      runCli(['generate', 'show the signup flow', 'signup.mmd', '--provider', 'openai'], {
+        cwd: directory,
+        io: buffer.io,
+        operations: {
+          generateDiagramFile: async (input, options) => {
+            generateOptions.push(options)
+            return {
+              ok: true,
+              outputPath: input.outputPath,
+              diagramType: 'flowchart',
+              assumptions: [],
+              source: 'flowchart TD\n  A --> B\n',
+            }
+          },
+        },
+      }),
+    ).resolves.toBe(0)
+
+    expect(generateOptions).toHaveLength(1)
+    expect(generateOptions[0]).toMatchObject({
+      provider: expect.objectContaining({
+        generate: expect.any(Function),
+      }),
+    })
+    expect(buffer.output().stdout).toContain('Generated flowchart diagram.\n')
+  })
+
   it('reports unsupported generation providers', async () => {
     const buffer = createBufferedIo()
 
     await expect(
-      runCli(['generate', 'show the signup flow', 'signup.mmd', '--provider', 'openai'], {
+      runCli(['generate', 'show the signup flow', 'signup.mmd', '--provider', 'local'], {
         io: buffer.io,
       }),
     ).resolves.toBe(1)
 
     expect(buffer.output()).toEqual({
       stdout: '',
-      stderr: 'Unsupported diagram generation provider "openai". Use one of: heuristic.\n',
+      stderr: 'Unsupported diagram generation provider "local". Use one of: heuristic, openai.\n',
     })
   })
 

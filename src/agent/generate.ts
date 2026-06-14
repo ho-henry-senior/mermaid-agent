@@ -55,10 +55,21 @@ export async function generateDiagramFile(
   }
 
   const provider = options.provider ?? createHeuristicDiagramProvider()
-  const generated = await provider.generate({
-    request,
-    type: input.type,
-  })
+  let generated: GeneratedDiagram
+
+  try {
+    generated = await provider.generate({
+      request,
+      type: input.type,
+    })
+  } catch (error: unknown) {
+    return {
+      ok: false,
+      error: `Failed to generate Mermaid source: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    }
+  }
 
   try {
     await mkdir(dirname(input.outputPath), { recursive: true })

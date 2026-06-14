@@ -110,6 +110,27 @@ describe('generateDiagramFile', () => {
     await expect(readFile(outputPath, 'utf8')).resolves.toContain('Email verified')
   })
 
+  it('returns provider generation errors', async () => {
+    await expect(
+      generateDiagramFile(
+        {
+          request: 'show the signup flow',
+          outputPath: join(tmpdir(), 'provider-error.mmd'),
+        },
+        {
+          provider: {
+            async generate() {
+              throw new Error('Provider is unavailable')
+            },
+          },
+        },
+      ),
+    ).resolves.toEqual({
+      ok: false,
+      error: 'Failed to generate Mermaid source: Provider is unavailable',
+    })
+  })
+
   it('rejects an empty diagram request', async () => {
     await expect(
       generateDiagramFile({

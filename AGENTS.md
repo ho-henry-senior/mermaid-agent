@@ -31,6 +31,8 @@ Use npm scripts for repeatable local workflows:
 - `npm test`: run the Vitest test suite.
 - `npm run generate -- "show the signup flow from landing page to email verification" examples/signup-flow.mmd`:
   generate and validate a Mermaid file from a plain-language request.
+- `OPENAI_API_KEY=... npm run generate -- "show the signup flow from landing page to email verification" examples/signup-flow.mmd --provider openai`:
+  generate with the OpenAI provider. Set `OPENAI_MODEL` to override the default model.
 - `npm run generate -- "show the signup flow from landing page to email verification" examples/signup-flow.mmd --render examples/signup-flow.svg`:
   generate, validate, and render SVG output.
 - `npm run render -- examples/signup-flow.mmd examples/signup-flow.svg`: render Mermaid to SVG.

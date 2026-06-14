@@ -9,6 +9,7 @@ import {
 import {
   isDiagramProviderName,
   resolveDiagramProvider,
+  supportedDiagramProviderNames,
   type DiagramProviderName,
 } from './agent/providers.js'
 import {
@@ -216,7 +217,9 @@ function parseGenerateOptions(args: string[]): ParseGenerateOptionsResult {
       if (!isDiagramProviderName(value)) {
         return {
           ok: false,
-          error: `Unsupported diagram generation provider "${value}". Use one of: heuristic.`,
+          error: `Unsupported diagram generation provider "${value}". Use one of: ${supportedDiagramProviderNames.join(
+            ', ',
+          )}.`,
         }
       }
 

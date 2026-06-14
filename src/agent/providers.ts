@@ -1,6 +1,7 @@
 import { createHeuristicDiagramProvider, type DiagramGenerationProvider } from './generate.js'
+import { createOpenAiDiagramProvider } from './openai-provider.js'
 
-export type DiagramProviderName = 'heuristic'
+export type DiagramProviderName = 'heuristic' | 'openai'
 
 export type ResolveDiagramProviderResult =
   | {
@@ -12,13 +13,20 @@ export type ResolveDiagramProviderResult =
       error: string
     }
 
-export const supportedDiagramProviderNames: DiagramProviderName[] = ['heuristic']
+export const supportedDiagramProviderNames: DiagramProviderName[] = ['heuristic', 'openai']
 
 export function resolveDiagramProvider(name: DiagramProviderName): ResolveDiagramProviderResult {
   if (name === 'heuristic') {
     return {
       ok: true,
       provider: createHeuristicDiagramProvider(),
+    }
+  }
+
+  if (name === 'openai') {
+    return {
+      ok: true,
+      provider: createOpenAiDiagramProvider(),
     }
   }
 

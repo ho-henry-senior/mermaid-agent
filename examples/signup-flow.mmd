@@ -1,7 +1,12 @@
 flowchart TD
-  A[User opens signup page] --> B[Submits account details]
-  B --> C[Receives verification email]
-  C --> D{Email verified?}
-  D -- Yes --> E[Account activated]
-  D -- No --> F[Resend verification email]
-  E --> G[Upgrade to paid plan]
+    A[Visit signup page] --> B[Enter details]
+    B --> C{Valid input?}
+    C -- No --> D[Show errors]
+    D --> B
+    C -- Yes --> E[Create account]
+    E --> F[Send verification email]
+    F --> G{Email verified?}
+    G -- No --> H[Show reminder]
+    H --> G
+    G -- Yes --> I[Complete profile]
+    I --> J[Signup complete]

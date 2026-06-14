@@ -50,12 +50,11 @@ Implemented capabilities:
 - Generate `.mmd` files that follow repository conventions for naming and structure.
 - Validate generated diagrams before reporting success.
 - Optionally render the final diagram to SVG and report the input/output paths.
+- Support a provider interface with deterministic heuristic and OpenAI-backed generation providers.
 
 Planned capabilities:
 
 - Attempt a focused repair pass when validation or rendering fails.
-- Add a replaceable model/provider layer for richer generation beyond the current deterministic
-  starter implementation.
 - Support context-aware generation from source files and documentation.
 
 ## Next: Revision Workflow
