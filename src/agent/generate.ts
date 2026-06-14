@@ -11,6 +11,21 @@ export type GenerateDiagramFileInput = {
   type?: DiagramType
 }
 
+export type GenerateDiagramInput = {
+  request: string
+  type?: DiagramType
+}
+
+export type GeneratedDiagram = {
+  diagramType: DiagramType
+  assumptions: string[]
+  source: string
+}
+
+export type DiagramGenerationProvider = {
+  generate(input: GenerateDiagramInput): Promise<GeneratedDiagram>
+}
+
 export type GenerateDiagramFileResult =
   | {
       ok: true
@@ -25,13 +40,8 @@ export type GenerateDiagramFileResult =
     }
 
 export type GenerateDiagramFileOptions = {
+  provider?: DiagramGenerationProvider
   validateMermaidFile?: typeof validateMermaidFile
-}
-
-type GeneratedDiagram = {
-  diagramType: DiagramType
-  assumptions: string[]
-  source: string
 }
 
 export async function generateDiagramFile(
@@ -44,7 +54,8 @@ export async function generateDiagramFile(
     return { ok: false, error: 'Diagram request is empty.' }
   }
 
-  const generated = generateDiagramSource({
+  const provider = options.provider ?? createHeuristicDiagramProvider()
+  const generated = await provider.generate({
     request,
     type: input.type,
   })
@@ -78,10 +89,15 @@ export async function generateDiagramFile(
   }
 }
 
-export function generateDiagramSource(input: {
-  request: string
-  type?: DiagramType
-}): GeneratedDiagram {
+export function createHeuristicDiagramProvider(): DiagramGenerationProvider {
+  return {
+    async generate(input) {
+      return generateDiagramSource(input)
+    },
+  }
+}
+
+export function generateDiagramSource(input: GenerateDiagramInput): GeneratedDiagram {
   const diagramType = input.type ?? chooseDiagramType(input.request)
   const assumptions = ['No source context was provided; diagram is inferred from the request.']
 

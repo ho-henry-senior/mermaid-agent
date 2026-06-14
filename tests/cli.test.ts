@@ -35,14 +35,16 @@ describe('runCli', () => {
     const directory = await mkdtemp(join(tmpdir(), 'mermaid-agent-'))
     const buffer = createBufferedIo()
     const generateInputs: unknown[] = []
+    const generateOptions: unknown[] = []
 
     await expect(
       runCli(['generate', 'show the signup flow', 'signup-flow.mmd'], {
         cwd: directory,
         io: buffer.io,
         operations: {
-          generateDiagramFile: async (input) => {
+          generateDiagramFile: async (input, options) => {
             generateInputs.push(input)
+            generateOptions.push(options)
             return {
               ok: true,
               outputPath: input.outputPath,
@@ -62,6 +64,12 @@ describe('runCli', () => {
         type: undefined,
       },
     ])
+    expect(generateOptions).toHaveLength(1)
+    expect(generateOptions[0]).toMatchObject({
+      provider: expect.objectContaining({
+        generate: expect.any(Function),
+      }),
+    })
     expect(buffer.output()).toEqual({
       stdout: [
         'Generated flowchart diagram.',
@@ -125,6 +133,44 @@ describe('runCli', () => {
     ])
     expect(buffer.output().stdout).toContain('Generated state diagram.\n')
     expect(buffer.output().stdout).toContain(`SVG: ${join(directory, 'ticket.svg')}\n`)
+  })
+
+  it('accepts an explicit heuristic generation provider', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'mermaid-agent-'))
+    const buffer = createBufferedIo()
+
+    await expect(
+      runCli(['generate', 'show the signup flow', 'signup.mmd', '--provider', 'heuristic'], {
+        cwd: directory,
+        io: buffer.io,
+        operations: {
+          generateDiagramFile: async (input) => ({
+            ok: true,
+            outputPath: input.outputPath,
+            diagramType: 'flowchart',
+            assumptions: [],
+            source: 'flowchart TD\n  A --> B\n',
+          }),
+        },
+      }),
+    ).resolves.toBe(0)
+
+    expect(buffer.output().stdout).toContain('Generated flowchart diagram.\n')
+  })
+
+  it('reports unsupported generation providers', async () => {
+    const buffer = createBufferedIo()
+
+    await expect(
+      runCli(['generate', 'show the signup flow', 'signup.mmd', '--provider', 'openai'], {
+        io: buffer.io,
+      }),
+    ).resolves.toBe(1)
+
+    expect(buffer.output()).toEqual({
+      stdout: '',
+      stderr: 'Unsupported diagram generation provider "openai". Use one of: heuristic.\n',
+    })
   })
 
   it('reports unsupported generate diagram types', async () => {

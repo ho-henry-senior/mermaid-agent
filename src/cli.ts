@@ -7,6 +7,11 @@ import {
   type GenerateDiagramFileResult,
 } from './agent/generate.js'
 import {
+  isDiagramProviderName,
+  resolveDiagramProvider,
+  type DiagramProviderName,
+} from './agent/providers.js'
+import {
   renderMermaidFile,
   type MermaidTheme,
   type RenderMermaidFileResult,
@@ -32,7 +37,7 @@ type RunCliOptions = {
 function usage(): string {
   return [
     'Usage:',
-    '  npm run generate -- "<request>" <output.mmd> [--type <type>] [--render <output.svg>] [--theme <theme>] [--background-color <color>] [--width <px>] [--height <px>]',
+    '  npm run generate -- "<request>" <output.mmd> [--provider <provider>] [--type <type>] [--render <output.svg>] [--theme <theme>] [--background-color <color>] [--width <px>] [--height <px>]',
     '  npm run validate -- <input.mmd>',
     '  npm run render -- <input.mmd> <output.svg> [--theme <theme>] [--background-color <color>] [--width <px>] [--height <px>]',
     '',
@@ -65,11 +70,23 @@ export async function runCli(args: string[], options: RunCliOptions = {}): Promi
       return 1
     }
 
-    const result: GenerateDiagramFileResult = await operations.generateDiagramFile({
-      request: input,
-      outputPath: resolve(cwd, output),
-      type: generateOptions.type,
-    })
+    const provider = resolveDiagramProvider(generateOptions.provider)
+
+    if (!provider.ok) {
+      io.stderr.write(`${provider.error}\n`)
+      return 1
+    }
+
+    const result: GenerateDiagramFileResult = await operations.generateDiagramFile(
+      {
+        request: input,
+        outputPath: resolve(cwd, output),
+        type: generateOptions.type,
+      },
+      {
+        provider: provider.provider,
+      },
+    )
 
     if (!result.ok) {
       io.stderr.write(`${result.error}\n`)
@@ -155,6 +172,7 @@ type ParseRenderOptionsResult =
 type ParseGenerateOptionsResult =
   | {
       ok: true
+      provider: DiagramProviderName
       type?: DiagramType
       renderOutputPath?: string
       renderOptions: RenderMermaidOptions
@@ -169,6 +187,7 @@ const supportedDiagramTypes = new Set<DiagramType>(['flowchart', 'sequence', 'st
 
 function parseGenerateOptions(args: string[]): ParseGenerateOptionsResult {
   const renderOptions: RenderMermaidOptions = {}
+  let provider: DiagramProviderName = 'heuristic'
   let type: DiagramType | undefined
   let renderOutputPath: string | undefined
 
@@ -189,6 +208,19 @@ function parseGenerateOptions(args: string[]): ParseGenerateOptionsResult {
       }
 
       type = value
+      index += 1
+      continue
+    }
+
+    if (flag === '--provider') {
+      if (!isDiagramProviderName(value)) {
+        return {
+          ok: false,
+          error: `Unsupported diagram generation provider "${value}". Use one of: heuristic.`,
+        }
+      }
+
+      provider = value
       index += 1
       continue
     }
@@ -218,7 +250,7 @@ function parseGenerateOptions(args: string[]): ParseGenerateOptionsResult {
     return { ok: false, error: 'Render options require --render <output.svg>.' }
   }
 
-  return { ok: true, type, renderOutputPath, renderOptions }
+  return { ok: true, provider, type, renderOutputPath, renderOptions }
 }
 
 function parseRenderOptions(args: string[]): ParseRenderOptionsResult {
