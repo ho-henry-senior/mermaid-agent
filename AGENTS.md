@@ -29,6 +29,10 @@ Use npm scripts for repeatable local workflows:
 
 - `npm run build`: type-check the TypeScript project.
 - `npm test`: run the Vitest test suite.
+- `npm run generate -- "show the signup flow from landing page to email verification" examples/signup-flow.mmd`:
+  generate and validate a Mermaid file from a plain-language request.
+- `npm run generate -- "show the signup flow from landing page to email verification" examples/signup-flow.mmd --render examples/signup-flow.svg`:
+  generate, validate, and render SVG output.
 - `npm run render -- examples/signup-flow.mmd examples/signup-flow.svg`: render Mermaid to SVG.
 - `npm run render -- examples/signup-flow.mmd examples/signup-flow.svg --theme neutral --background-color transparent`: render with explicit output options.
 - `npm run test:runtime`: run opt-in Mermaid CLI runtime rendering tests.

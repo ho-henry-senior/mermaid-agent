@@ -31,6 +31,117 @@ function createBufferedIo() {
 }
 
 describe('runCli', () => {
+  it('generates a Mermaid file', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'mermaid-agent-'))
+    const buffer = createBufferedIo()
+    const generateInputs: unknown[] = []
+
+    await expect(
+      runCli(['generate', 'show the signup flow', 'signup-flow.mmd'], {
+        cwd: directory,
+        io: buffer.io,
+        operations: {
+          generateDiagramFile: async (input) => {
+            generateInputs.push(input)
+            return {
+              ok: true,
+              outputPath: input.outputPath,
+              diagramType: 'flowchart',
+              assumptions: ['No source context was provided.'],
+              source: 'flowchart TD\n  A --> B\n',
+            }
+          },
+        },
+      }),
+    ).resolves.toBe(0)
+
+    expect(generateInputs).toEqual([
+      {
+        request: 'show the signup flow',
+        outputPath: join(directory, 'signup-flow.mmd'),
+        type: undefined,
+      },
+    ])
+    expect(buffer.output()).toEqual({
+      stdout: [
+        'Generated flowchart diagram.',
+        `Mermaid: ${join(directory, 'signup-flow.mmd')}`,
+        'Assumptions: No source context was provided.',
+        '',
+      ].join('\n'),
+      stderr: '',
+    })
+  })
+
+  it('generates and renders a Mermaid file', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'mermaid-agent-'))
+    const buffer = createBufferedIo()
+    const renderInputs: unknown[] = []
+
+    await expect(
+      runCli(
+        [
+          'generate',
+          'show the support ticket lifecycle',
+          'ticket.mmd',
+          '--type',
+          'state',
+          '--render',
+          'ticket.svg',
+          '--theme',
+          'neutral',
+        ],
+        {
+          cwd: directory,
+          io: buffer.io,
+          operations: {
+            generateDiagramFile: async (input) => ({
+              ok: true,
+              outputPath: input.outputPath,
+              diagramType: input.type ?? 'flowchart',
+              assumptions: [],
+              source: 'stateDiagram-v2\n  [*] --> Open\n',
+            }),
+            renderMermaidFile: async (input) => {
+              renderInputs.push(input)
+              return {
+                ok: true,
+                outputPath: input.outputPath,
+              }
+            },
+          },
+        },
+      ),
+    ).resolves.toBe(0)
+
+    expect(renderInputs).toEqual([
+      {
+        inputPath: join(directory, 'ticket.mmd'),
+        outputPath: join(directory, 'ticket.svg'),
+        options: {
+          theme: 'neutral',
+        },
+      },
+    ])
+    expect(buffer.output().stdout).toContain('Generated state diagram.\n')
+    expect(buffer.output().stdout).toContain(`SVG: ${join(directory, 'ticket.svg')}\n`)
+  })
+
+  it('reports unsupported generate diagram types', async () => {
+    const buffer = createBufferedIo()
+
+    await expect(
+      runCli(['generate', 'show the signup flow', 'signup.mmd', '--type', 'timeline'], {
+        io: buffer.io,
+      }),
+    ).resolves.toBe(1)
+
+    expect(buffer.output()).toEqual({
+      stdout: '',
+      stderr: 'Unsupported diagram type "timeline". Use one of: flowchart, sequence, state, er.\n',
+    })
+  })
+
   it('validates a Mermaid file', async () => {
     const directory = await mkdtemp(join(tmpdir(), 'mermaid-agent-'))
     await writeFile(join(directory, 'diagram.mmd'), 'flowchart TD\n  A --> B')

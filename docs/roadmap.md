@@ -40,17 +40,23 @@ Remaining hardening opportunities:
 - Add more diagram-type fixtures as new project workflows need them.
 - Expand runtime tests across more output options if they become important to agent behavior.
 
-## Next: Diagram Generation Agent
+## In Progress: Diagram Generation Agent
 
 Goal: convert plain-language requests into valid Mermaid source files.
 
-Planned capabilities:
+Implemented capabilities:
 
 - Choose an appropriate Mermaid diagram type unless the user specifies one.
 - Generate `.mmd` files that follow repository conventions for naming and structure.
 - Validate generated diagrams before reporting success.
+- Optionally render the final diagram to SVG and report the input/output paths.
+
+Planned capabilities:
+
 - Attempt a focused repair pass when validation or rendering fails.
-- Render the final diagram to SVG and report the input/output paths.
+- Add a replaceable model/provider layer for richer generation beyond the current deterministic
+  starter implementation.
+- Support context-aware generation from source files and documentation.
 
 ## Next: Revision Workflow
 

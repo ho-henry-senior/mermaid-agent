@@ -2,6 +2,11 @@ import { fileURLToPath } from 'node:url'
 import { resolve } from 'node:path'
 
 import {
+  generateDiagramFile,
+  type DiagramType,
+  type GenerateDiagramFileResult,
+} from './agent/generate.js'
+import {
   renderMermaidFile,
   type MermaidTheme,
   type RenderMermaidFileResult,
@@ -18,6 +23,7 @@ type RunCliOptions = {
   cwd?: string
   io?: CliIo
   operations?: {
+    generateDiagramFile?: typeof generateDiagramFile
     renderMermaidFile?: typeof renderMermaidFile
     validateMermaidFile?: typeof validateMermaidFile
   }
@@ -26,10 +32,12 @@ type RunCliOptions = {
 function usage(): string {
   return [
     'Usage:',
+    '  npm run generate -- "<request>" <output.mmd> [--type <type>] [--render <output.svg>] [--theme <theme>] [--background-color <color>] [--width <px>] [--height <px>]',
     '  npm run validate -- <input.mmd>',
     '  npm run render -- <input.mmd> <output.svg> [--theme <theme>] [--background-color <color>] [--width <px>] [--height <px>]',
     '',
     'Example:',
+    '  npm run generate -- "show the signup flow from landing page to email verification" examples/signup-flow.mmd',
     '  npm run validate -- examples/signup-flow.mmd',
     '  npm run render -- examples/signup-flow.mmd examples/signup-flow.svg --theme neutral --background-color transparent',
   ].join('\n')
@@ -42,11 +50,56 @@ export async function runCli(args: string[], options: RunCliOptions = {}): Promi
     stderr: process.stderr,
   }
   const operations = {
+    generateDiagramFile,
     renderMermaidFile,
     validateMermaidFile,
     ...options.operations,
   }
   const [command, input, output, ...renderArgs] = args
+
+  if (command === 'generate' && input && output) {
+    const generateOptions = parseGenerateOptions(renderArgs)
+
+    if (!generateOptions.ok) {
+      io.stderr.write(`${generateOptions.error}\n`)
+      return 1
+    }
+
+    const result: GenerateDiagramFileResult = await operations.generateDiagramFile({
+      request: input,
+      outputPath: resolve(cwd, output),
+      type: generateOptions.type,
+    })
+
+    if (!result.ok) {
+      io.stderr.write(`${result.error}\n`)
+      return 1
+    }
+
+    io.stdout.write(`Generated ${result.diagramType} diagram.\n`)
+    io.stdout.write(`Mermaid: ${result.outputPath}\n`)
+
+    if (generateOptions.renderOutputPath) {
+      const renderResult = await operations.renderMermaidFile({
+        inputPath: result.outputPath,
+        outputPath: resolve(cwd, generateOptions.renderOutputPath),
+        options: generateOptions.renderOptions,
+      })
+
+      if (!renderResult.ok) {
+        io.stderr.write(`${renderResult.error}\n`)
+        return 1
+      }
+
+      io.stdout.write(`SVG: ${renderResult.outputPath}\n`)
+    }
+
+    if (result.assumptions.length > 0) {
+      io.stdout.write(`Assumptions: ${result.assumptions.join(' ')}\n`)
+    }
+
+    return 0
+  }
 
   if (command === 'validate' && input && !output) {
     const result: ValidateMermaidFileResult = await operations.validateMermaidFile(
@@ -99,7 +152,74 @@ type ParseRenderOptionsResult =
       error: string
     }
 
+type ParseGenerateOptionsResult =
+  | {
+      ok: true
+      type?: DiagramType
+      renderOutputPath?: string
+      renderOptions: RenderMermaidOptions
+    }
+  | {
+      ok: false
+      error: string
+    }
+
 const supportedThemes = new Set<MermaidTheme>(['default', 'forest', 'dark', 'neutral'])
+const supportedDiagramTypes = new Set<DiagramType>(['flowchart', 'sequence', 'state', 'er'])
+
+function parseGenerateOptions(args: string[]): ParseGenerateOptionsResult {
+  const renderOptions: RenderMermaidOptions = {}
+  let type: DiagramType | undefined
+  let renderOutputPath: string | undefined
+
+  for (let index = 0; index < args.length; index += 1) {
+    const flag = args[index]
+    const value = args[index + 1]
+
+    if (!value || value.startsWith('--')) {
+      return { ok: false, error: `Missing value for generate option ${flag}.` }
+    }
+
+    if (flag === '--type') {
+      if (!isDiagramType(value)) {
+        return {
+          ok: false,
+          error: `Unsupported diagram type "${value}". Use one of: flowchart, sequence, state, er.`,
+        }
+      }
+
+      type = value
+      index += 1
+      continue
+    }
+
+    if (flag === '--render') {
+      renderOutputPath = value
+      index += 1
+      continue
+    }
+
+    const renderOption = parseRenderOption(flag, value, renderOptions)
+
+    if (!renderOption.ok) {
+      return {
+        ok: false,
+        error:
+          renderOption.error === `Unknown render option ${flag}.`
+            ? `Unknown generate option ${flag}.`
+            : renderOption.error,
+      }
+    }
+
+    index += 1
+  }
+
+  if (Object.keys(renderOptions).length > 0 && !renderOutputPath) {
+    return { ok: false, error: 'Render options require --render <output.svg>.' }
+  }
+
+  return { ok: true, type, renderOutputPath, renderOptions }
+}
 
 function parseRenderOptions(args: string[]): ParseRenderOptionsResult {
   const options: RenderMermaidOptions = {}
@@ -112,57 +232,71 @@ function parseRenderOptions(args: string[]): ParseRenderOptionsResult {
       return { ok: false, error: `Missing value for render option ${flag}.` }
     }
 
-    if (flag === '--theme') {
-      if (!isMermaidTheme(value)) {
-        return {
-          ok: false,
-          error: `Unsupported Mermaid theme "${value}". Use one of: default, forest, dark, neutral.`,
-        }
-      }
+    const renderOption = parseRenderOption(flag, value, options)
 
-      options.theme = value
-      index += 1
-      continue
+    if (!renderOption.ok) {
+      return renderOption
     }
 
-    if (flag === '--background-color') {
-      options.backgroundColor = value
-      index += 1
-      continue
-    }
-
-    if (flag === '--width') {
-      const width = parsePositiveIntegerOption('width', value)
-
-      if (!width.ok) {
-        return width
-      }
-
-      options.width = width.value
-      index += 1
-      continue
-    }
-
-    if (flag === '--height') {
-      const height = parsePositiveIntegerOption('height', value)
-
-      if (!height.ok) {
-        return height
-      }
-
-      options.height = height.value
-      index += 1
-      continue
-    }
-
-    return { ok: false, error: `Unknown render option ${flag}.` }
+    index += 1
   }
 
   return { ok: true, options }
 }
 
+function parseRenderOption(
+  flag: string,
+  value: string,
+  options: RenderMermaidOptions,
+): { ok: true } | { ok: false; error: string } {
+  if (flag === '--theme') {
+    if (!isMermaidTheme(value)) {
+      return {
+        ok: false,
+        error: `Unsupported Mermaid theme "${value}". Use one of: default, forest, dark, neutral.`,
+      }
+    }
+
+    options.theme = value
+    return { ok: true }
+  }
+
+  if (flag === '--background-color') {
+    options.backgroundColor = value
+    return { ok: true }
+  }
+
+  if (flag === '--width') {
+    const width = parsePositiveIntegerOption('width', value)
+
+    if (!width.ok) {
+      return width
+    }
+
+    options.width = width.value
+    return { ok: true }
+  }
+
+  if (flag === '--height') {
+    const height = parsePositiveIntegerOption('height', value)
+
+    if (!height.ok) {
+      return height
+    }
+
+    options.height = height.value
+    return { ok: true }
+  }
+
+  return { ok: false, error: `Unknown render option ${flag}.` }
+}
+
 function isMermaidTheme(value: string): value is MermaidTheme {
   return supportedThemes.has(value as MermaidTheme)
+}
+
+function isDiagramType(value: string): value is DiagramType {
+  return supportedDiagramTypes.has(value as DiagramType)
 }
 
 function parsePositiveIntegerOption(

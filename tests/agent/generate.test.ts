@@ -1,0 +1,84 @@
+import { mkdtemp, readFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { describe, expect, it } from 'vitest'
+
+import { generateDiagramFile, generateDiagramSource } from '../../src/agent/generate.js'
+
+describe('generateDiagramSource', () => {
+  it('generates a signup flowchart from a plain-language request', () => {
+    const result = generateDiagramSource({
+      request: 'show the signup flow from landing page to email verification',
+    })
+
+    expect(result.diagramType).toBe('flowchart')
+    expect(result.source).toContain('flowchart TD')
+    expect(result.source).toContain('Landing page')
+    expect(result.source).toContain('Email verified')
+    expect(result.assumptions).toEqual([
+      'No source context was provided; diagram is inferred from the request.',
+    ])
+  })
+
+  it('chooses a sequence diagram for interaction requests', () => {
+    const result = generateDiagramSource({
+      request: 'show the interaction between browser and API',
+    })
+
+    expect(result.diagramType).toBe('sequence')
+    expect(result.source).toContain('sequenceDiagram')
+    expect(result.source).toContain('participant A as Browser')
+    expect(result.source).toContain('participant B as API')
+  })
+
+  it('uses an explicitly requested diagram type', () => {
+    const result = generateDiagramSource({
+      request: 'show the support ticket lifecycle',
+      type: 'state',
+    })
+
+    expect(result.diagramType).toBe('state')
+    expect(result.source).toContain('stateDiagram-v2')
+  })
+})
+
+describe('generateDiagramFile', () => {
+  it('writes and validates a generated Mermaid file', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'mermaid-agent-generate-'))
+    const outputPath = join(directory, 'signup-flow.mmd')
+    const validatedPaths: string[] = []
+
+    const result = await generateDiagramFile(
+      {
+        request: 'show the signup flow from landing page to email verification',
+        outputPath,
+      },
+      {
+        validateMermaidFile: async (path) => {
+          validatedPaths.push(path)
+          return { ok: true, inputPath: path }
+        },
+      },
+    )
+
+    expect(result).toMatchObject({
+      ok: true,
+      outputPath,
+      diagramType: 'flowchart',
+    })
+    expect(validatedPaths).toEqual([outputPath])
+    await expect(readFile(outputPath, 'utf8')).resolves.toContain('Email verified')
+  })
+
+  it('rejects an empty diagram request', async () => {
+    await expect(
+      generateDiagramFile({
+        request: '   ',
+        outputPath: join(tmpdir(), 'empty-request.mmd'),
+      }),
+    ).resolves.toEqual({
+      ok: false,
+      error: 'Diagram request is empty.',
+    })
+  })
+})
